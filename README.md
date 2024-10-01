@@ -1,7 +1,5 @@
 # Timer de Pit Stop - Fórmula E 🏎️⏱️
 
-![Fórmula E]([https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Formula_E_logo.svg/2560px-Formula_E_logo.svg.png](https://images.livemint.com/img/2021/02/25/1140x641/3429bd12-759d-11eb-8c75-1a927573b469_1614268648035_1614268681145.jpg))
-
 ## Descrição
 
 Este projeto consiste em um **Timer de Pit Stop** desenvolvido para simular e registrar o tempo de pit stops durante uma corrida de Fórmula E. Utilizando um microcontrolador **ESP32**, o sistema permite que o usuário inicie e pause o cronômetro, armazenando os tempos de cada pit stop realizado. Ao final, é possível calcular a média dos tempos dos pit stops.
