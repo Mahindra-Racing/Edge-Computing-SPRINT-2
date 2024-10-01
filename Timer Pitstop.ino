@@ -1,105 +1,99 @@
+#include <WiFi.h>
+#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C LCD = LiquidCrystal_I2C(0x27, 16, 2);
 
-const int igomb = 2; // Botão para iniciar e calcular a média dos pit stops
-const int tgomb = 4; // Botão para resetar
+const int startButtonPin = 5; // Botão para iniciar e calcular a média dos pit stops
+const int resetButtonPin = 4; // Botão para resetar
 
-unsigned long iido = 0; // Tempo de início
-unsigned long tido = 0; // Tempo decorrido
-bool idozito = false; // Estado do timer (ativo/inativo)
-
-const int maxPitStops = 5; // Número máximo de pit stops a serem armazenados
-unsigned long pitStops[maxPitStops][2]; // Array para armazenar tempos de pit stops (segundos, milissegundos)
+unsigned long startTime = 0; // Tempo de início
+bool timerActive = false; // Estado do timer
 int pitStopCount = 0; // Contador de pit stops
+unsigned long pitStops[5][2]; // Array para armazenar tempos de pit stops
 
 void setup() {
-  pinMode(igomb, INPUT_PULLUP); // Configura o pino do botão de iniciar
-  pinMode(tgomb, INPUT_PULLUP); // Configura o pino do botão de resetar
-  lcd.begin(16, 2); // Inicializa o LCD
+  Serial.begin(115200);
+  LCD.init();
+  LCD.backlight();
+  
+  pinMode(startButtonPin, INPUT_PULLUP); // Configura o pino do botão de iniciar
+  pinMode(resetButtonPin, INPUT_PULLUP); // Configura o pino do botão de resetar
+
+  LCD.setCursor(0, 0);
+  LCD.print("Aguardando inicio");
 }
 
 void loop() {
-  gomb(); // Verifica os botões
-  if (idozito) {
-    tido = millis() - iido; // Calcula o tempo decorrido em milissegundos
+  checkButtons();
 
-    // Converte milissegundos em segundos e milissegundos
-    unsigned long segundos = tido / 1000; // Calcula os segundos
-    unsigned long milissegundos = tido % 1000; // Calcula os milissegundos restantes
-
-    lcd.setCursor(0, 0);
-    lcd.print("Tempo: ");
-    lcd.print(segundos); // Mostra os segundos
-    lcd.print(" s "); // Adiciona a unidade de segundos
-    lcd.print(milissegundos); // Mostra os milissegundos
-    lcd.print(" ms"); // Adiciona a unidade de milissegundos
+  if (timerActive) {
+    unsigned long elapsedTime = millis() - startTime; // Calcula o tempo decorrido
+    LCD.setCursor(0, 1);
+    LCD.print("Tempo: ");
+    LCD.print(elapsedTime / 1000); // Segundos
+    LCD.print(" s ");
+    LCD.print(elapsedTime % 1000); // Milissegundos
+    LCD.print(" ms");
   }
 }
 
-void gomb() {
-  // Verifica o botão de iniciar/cálculo da média
-  if (digitalRead(igomb) == LOW) {
+void checkButtons() {
+  // Verifica o botão de iniciar
+  if (digitalRead(startButtonPin) == LOW) {
     delay(50); // Debounce
-    if (digitalRead(igomb) == LOW) {
-      if (idozito) {
-        // Armazena o tempo do pit stop
-        unsigned long pitStopTime = millis() - iido; // Calcula o tempo atual desde o início
-        if (pitStopCount < maxPitStops) {
-          pitStops[pitStopCount][0] = pitStopTime / 1000; // Armazena os segundos
-          pitStops[pitStopCount][1] = pitStopTime % 1000; // Armazena os milissegundos
-          pitStopCount++; // Incrementa o contador de pit stops
+    if (digitalRead(startButtonPin) == LOW) {
+      if (timerActive) {
+        if (pitStopCount < 5) {
+          pitStops[pitStopCount][0] = (millis() - startTime) / 1000; // Segundos
+          pitStops[pitStopCount][1] = (millis() - startTime) % 1000; // Milissegundos
+          pitStopCount++;
         }
-        
-        // Mostra o último pit stop no LCD
-        lcd.clear(); // Limpa o display
-        lcd.setCursor(0, 0);
-        lcd.print("#");
-        lcd.print(pitStopCount); // Mostra o número do pit stop
-        lcd.print(" Pitstop: ");
-        lcd.print(pitStops[pitStopCount - 1][0]); // Segundos do último pit stop
-        lcd.print("s ");
-        lcd.print(pitStops[pitStopCount - 1][1]); // Milissegundos do último pit stop
-        lcd.print("ms");
-
-        idozito = false; // Para o timer
+        LCD.clear();
+        LCD.setCursor(0, 0);
+        LCD.print("Pitstop #");
+        LCD.print(pitStopCount);
+        LCD.print(": ");
+        LCD.print(pitStops[pitStopCount - 1][0]);
+        LCD.print("s ");
+        LCD.print(pitStops[pitStopCount - 1][1]);
+        LCD.print("ms");
+        timerActive = false; // Para o timer
       } else {
-        idozito = true; // Inicia o timer
-        iido = millis(); // Reseta o tempo de início para agora
+        timerActive = true; // Inicia o timer
+        startTime = millis(); // Reseta o tempo de início
       }
       delay(250); // Espera para evitar múltiplos acionamentos
     }
   }
 
   // Verifica o botão de resetar
-  if (digitalRead(tgomb) == LOW && !idozito) {
+  if (digitalRead(resetButtonPin) == LOW && !timerActive) {
     delay(50); // Debounce
-    if (digitalRead(tgomb) == LOW) {
-      // Calcula e exibe a média dos pit stops
+    if (digitalRead(resetButtonPin) == LOW) {
       if (pitStopCount > 0) {
-        unsigned long totalSegundos = 0;
-        unsigned long totalMilissegundos = 0;
+        unsigned long totalSeconds = 0, totalMilliseconds = 0;
         
         for (int i = 0; i < pitStopCount; i++) {
-          totalSegundos += pitStops[i][0];
-          totalMilissegundos += pitStops[i][1];
+          totalSeconds += pitStops[i][0];
+          totalMilliseconds += pitStops[i][1];
         }
 
-        // Converte total para média
-        unsigned long mediaSegundos = totalSegundos / pitStopCount;
-        unsigned long mediaMilissegundos = totalMilissegundos / pitStopCount;
+        // Calcula a média dos pit stops
+        unsigned long averageSeconds = totalSeconds / pitStopCount;
+        unsigned long averageMilliseconds = totalMilliseconds / pitStopCount;
 
         // Exibe a média no LCD
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Media: ");
-        lcd.print(mediaSegundos); // Mostra a média dos segundos
-        lcd.print("s ");
-        lcd.print(mediaMilissegundos); // Mostra a média dos milissegundos
-        lcd.print("ms");
+        LCD.clear();
+        LCD.setCursor(0, 0);
+        LCD.print("Media: ");
+        LCD.print(averageSeconds); // Média dos segundos
+        LCD.print("s ");
+        LCD.print(averageMilliseconds); // Média dos milissegundos
+        LCD.print("ms");
 
         // Reseta os pit stops
-        pitStopCount = 0;
+        pitStopCount = 0; 
       }
       delay(250); // Espera para evitar múltiplos acionamentos
     }
